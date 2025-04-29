@@ -2,16 +2,21 @@
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.asymmetric import ec
+
 
 
 def generar_llaves(ruta_privada, ruta_publica, password: bytes = b'secreto'):
     """Genera un par de llaves RSA y las guarda en archivos .pem"""
 
+    private_key = ec.generate_private_key(ec.SECP256R1())
+
+    """""
     private_key = rsa.generate_private_key(
         public_exponent=65537,
         key_size=2048
     )
-
+    """""
     # Guardar llave privada con cifrado por contraseña
     pem_privada = private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
