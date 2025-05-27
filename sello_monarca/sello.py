@@ -1,96 +1,85 @@
 # sello_monarca/sello.py
+from __future__ import annotations
+from io import BytesIO
+import json, uuid, base64, datetime as dt
+from hashlib import sha256
+from typing import Tuple, Dict, Any
 
-from sello_monarca.llaves import cargar_llave_privada, cargar_llave_publica
-from sello_monarca.utils import (
-    calcular_hash,
-    firmar_hash,
-    verificar_firma,
-    firma_a_base64,
-    base64_a_firma
-)
-from sello_monarca.pdf_handler import leer_pdf_completo, guardar_pdf, guardar_pdf_con_firma_pendiente
+from PyPDF2 import PdfReader, PdfWriter, generic
+from sello_monarca.utils import firmar_hash, verificar_firma
+from sello_monarca.qr_handler import generar_pagina_qr_bytes
 
-from datetime import datetime
+META_KEY = "/CM_META"
+SIGN_PLACEHOLDER = "FIRMA_PENDIENTE"
 
-class SelloMonarca:
-    def __init__(self, ruta_llave_privada=None, ruta_llave_publica=None, password_privada=b'secreto'):
-        self.ruta_llave_privada = ruta_llave_privada
-        self.ruta_llave_publica = ruta_llave_publica
-        self.password = password_privada
-        self.private_key = None
-        self.public_key = None
+def _utc_iso() -> str:
+    return dt.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
 
-        if ruta_llave_privada:
-            self.private_key = cargar_llave_privada(ruta_llave_privada, password_privada)
-        if ruta_llave_publica:
-            self.public_key = cargar_llave_publica(ruta_llave_publica)
+def _merge_metadata(base_meta: dict, extra: dict) -> dict:
+    meta = {}
+    for k, v in base_meta.items():
+        meta[generic.NameObject(str(k))] = generic.create_string_object(str(v))
+    for k, v in extra.items():
+        meta[generic.NameObject(k)] = generic.create_string_object(str(v))
+    return meta
 
-    def firmar_bytes(self, data: bytes) -> str:
-        if not self.private_key:
-            raise ValueError("No se ha cargado la llave privada.")
-        hash_data = calcular_hash(data)
-        firma = firmar_hash(hash_data, self.private_key)
-        return firma_a_base64(firma)
+def _embed_meta(pdf_bytes: bytes, json_meta: str) -> bytes:
+    reader = PdfReader(BytesIO(pdf_bytes))
+    writer = PdfWriter()
+    for p in reader.pages:
+        writer.add_page(p)
+    writer.add_metadata(_merge_metadata(reader.metadata or {}, {META_KEY: json_meta}))
+    out = BytesIO()
+    writer.write(out)
+    return out.getvalue()
 
-    def verificar_firma(self, data: bytes, firma_b64: str) -> bool:
-        if not self.public_key:
-            raise ValueError("No se ha cargado la llave pública.")
-        hash_data = calcular_hash(data)
-        firma = base64_a_firma(firma_b64)
-        return verificar_firma(hash_data, firma, self.public_key)
+def sell(pdf_original: bytes,
+         user_meta: Dict[str, Any],
+         private_key,
+         base_url: str = "https://mi-app.com/v/") -> Tuple[bytes, str]:
+    doc_id = str(uuid.uuid4())
+    verify_url = f"{base_url}{doc_id}"
 
-    def firmar_pdf(self, path_pdf_original: str, path_pdf_sellado: str):
-        if not self.private_key:
-            raise ValueError("No se ha cargado la llave privada.")
+    meta = {
+        **user_meta,
+        "id": doc_id,
+        "uploaded_at": _utc_iso(),
+        "verify_url": verify_url,
+        "signature": SIGN_PLACEHOLDER
+    }
+    meta_json = json.dumps(meta, separators=(",", ":"))
+    h = sha256(meta_json.encode()).digest()
+    signature = firmar_hash(h, private_key)
+    meta["signature"] = base64.b64encode(signature).decode()
+    meta_json_signed = json.dumps(meta, separators=(",", ":"))
 
-        # 1. Crear metadatos base
-        metadatos_base = {
-            "/Author": "Casa Monarca",
-            "/Title": "Documento Sellado Oficialmente",
-            "/Subject": "Sello Monarca con firma digital",
-            "/ModDate": f"D:{datetime.now().strftime('%Y%m%d%H%M%S')}",
-            "/EntidadSelladora": "Casa Monarca",
-            "/FirmaDigital": "FIRMA_PENDIENTE"
-        }
+    pdf_meta = _embed_meta(pdf_original, meta_json_signed)
 
-        # 2. Guardar versión temporal sin la firma
-        temp_path = "temp_sin_firma.pdf"
-        guardar_pdf_con_firma_pendiente(temp_path, path_pdf_original, metadatos_base)
+    qr_pdf_bytes = generar_pagina_qr_bytes(verify_url)
+    qr_reader = PdfReader(BytesIO(qr_pdf_bytes))
+    reader_final = PdfReader(BytesIO(pdf_meta))
+    writer_final = PdfWriter()
+    for p in reader_final.pages:
+        writer_final.add_page(p)
+    writer_final.add_page(qr_reader.pages[0])           # página del QR
+    writer_final.add_metadata(reader_final.metadata)    # conserva metadatos
 
-        # 3. Calcular hash de esa versión
-        contenido_sin_firma = leer_pdf_completo(temp_path)["bytes"]
-        hash_temp = calcular_hash(contenido_sin_firma)
+    out = BytesIO()
+    writer_final.write(out)
+    return out.getvalue(), doc_id
 
-        # 4. Firmar y codificar
-        firma = firmar_hash(hash_temp, self.private_key)
-        firma_b64 = firma_a_base64(firma)
+def verify(pdf_bytes: bytes, public_key) -> Tuple[bool, Dict[str, Any]]:
+    reader = PdfReader(BytesIO(pdf_bytes))
+    meta_raw = reader.metadata.get(META_KEY, "{}")
+    meta = json.loads(str(meta_raw))
 
-        # 5. Volver a leer el PDF y guardar con firma real
-        datos_finales = leer_pdf_completo(temp_path)
-        metadatos_base["/FirmaDigital"] = firma_b64
-        guardar_pdf(path_pdf_sellado, datos_finales["pages"], metadatos_base)
+    sig_b64 = meta.get("signature", "")
+    if sig_b64 in ("", SIGN_PLACEHOLDER):
+        return False, meta
 
-    def verificar_pdf(self, path_pdf: str) -> bool:
-        if not self.public_key:
-            raise ValueError("No se ha cargado la llave pública.")
-
-        # 1. Leer PDF completo
-        datos_pdf = leer_pdf_completo(path_pdf)
-        firma_b64 = datos_pdf["metadata"].get("/FirmaDigital", "")
-        if not firma_b64 or firma_b64 == "FIRMA_PENDIENTE":
-            print("No se encontró firma válida.")
-            return False
-
-        # 2. Crear versión temporal sin la firma
-        temp_path = "temp_verificacion.pdf"
-        metadatos_temp = dict(datos_pdf["metadata"])
-        metadatos_temp["/FirmaDigital"] = "FIRMA_PENDIENTE"
-        guardar_pdf(temp_path, datos_pdf["pages"], metadatos_temp)
-
-        # 3. Calcular hash del contenido sin firma
-        contenido_sin_firma = leer_pdf_completo(temp_path)["bytes"]
-        hash_verificacion = calcular_hash(contenido_sin_firma)
-
-        # 4. Verificar
-        firma = base64_a_firma(firma_b64)
-        return verificar_firma(hash_verificacion, firma, self.public_key)
+    signature = base64.b64decode(sig_b64)
+    meta["signature"] = SIGN_PLACEHOLDER
+    meta_json = json.dumps(meta, separators=(",", ":")).encode()
+    h = sha256(meta_json).digest()
+    valido = verificar_firma(h, signature, public_key)
+    return valido, meta

@@ -1,40 +1,22 @@
 # sello_monarca/llaves.py
 
 from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.asymmetric import ec
 
-
-
-def generar_llaves(ruta_privada, ruta_publica, password: bytes = b'secreto'):
-    """Genera un par de llaves RSA y las guarda en archivos .pem"""
-
-    private_key = ec.generate_private_key(ec.SECP256R1())
-
-    """""
-    private_key = rsa.generate_private_key(
-        public_exponent=65537,
-        key_size=2048
+def generar_llaves(ruta_priv, ruta_pub, password=b"secreto"):
+    key = ec.generate_private_key(ec.SECP256R1())
+    pem_priv = key.private_bytes(
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.PKCS8,
+        serialization.BestAvailableEncryption(password)
     )
-    """""
-    # Guardar llave privada con cifrado por contraseña
-    pem_privada = private_key.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.BestAvailableEncryption(password)
-    )
-    with open(ruta_privada, "wb") as f:
-        f.write(pem_privada)
+    open(ruta_priv, "wb").write(pem_priv)
 
-    # Guardar llave pública
-    public_key = private_key.public_key()
-    pem_publica = public_key.public_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    pem_pub = key.public_key().public_bytes(
+        serialization.Encoding.PEM,
+        serialization.PublicFormat.SubjectPublicKeyInfo
     )
-    with open(ruta_publica, "wb") as f:
-        f.write(pem_publica)
-
+    open(ruta_pub, "wb").write(pem_pub)
 
 def cargar_llave_privada(ruta, password: bytes):
     """Carga una llave privada desde un archivo .pem"""

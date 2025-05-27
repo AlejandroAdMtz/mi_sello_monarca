@@ -2,13 +2,11 @@ __pycache__/
 *.pyc
 .venv/
 .env
-keys/
+#keys/
 *.sig
 verificacion_temp.pdf
-documento_temp.pdf
-
 examples/
-
+*.pdf
 temp_pagina_qr.pdf
 temp_qr.png
 temp_sin_firma.pdf

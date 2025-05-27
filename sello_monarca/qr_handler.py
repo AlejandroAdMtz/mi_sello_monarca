@@ -1,21 +1,33 @@
 # sello_monarca/qr_handler.py
-
+from io import BytesIO
 import qrcode
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
-from PyPDF2 import PdfReader, PdfWriter
+from reportlab.lib.utils import ImageReader
 
-def generar_pagina_qr(url: str, salida_pdf: str):
-    """Genera una página PDF con un QR grande al centro que apunta a una URL"""
-    qr = qrcode.make(url)
-    qr_path = "temp_qr.png"
-    qr.save(qr_path)
+def generar_pagina_qr_bytes(url: str) -> bytes:
+    """
+    Devuelve un PDF en bytes con una sola página que contiene el QR
+    """
+    # Generar imagen del QR
+    qr_img = qrcode.make(url)
+    qr_buf = BytesIO()
+    qr_img.save(qr_buf, format="PNG")
+    qr_buf.seek(0)
+    qr_reader = ImageReader(qr_buf)
 
-    c = canvas.Canvas(salida_pdf, pagesize=letter)
-    c.drawImage(qr_path, 150, 300, width=300, height=300)
+    # Generar PDF con esa imagen
+    pdf_buf = BytesIO()
+    c = canvas.Canvas(pdf_buf, pagesize=letter)
+    c.drawImage(qr_reader, 150, 300, width=300, height=300)
     c.setFont("Helvetica", 12)
     c.drawCentredString(300, 280, "Escanea para verificar autenticidad")
+    c.showPage()  # ← cierra la página y permite que el PDF sea válido
     c.save()
+
+    pdf_buf.seek(0)
+    return pdf_buf.getvalue()
+
 
 def insertar_pagina_qr(pdf_base: str, pdf_salida: str, qr_url: str):
     """Agrega una página con QR al final del PDF base"""
