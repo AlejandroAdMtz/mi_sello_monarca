@@ -2,7 +2,7 @@ __pycache__/
 *.pyc
 .venv/
 .env
-#keys/
+keys/
 *.sig
 verificacion_temp.pdf
 examples/
