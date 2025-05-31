@@ -120,7 +120,7 @@ def verificacion_publica(doc_id):
         # Parseamos la cadena ISO "2025-05-30T23:12:35Z"
         dt_utc = dt.datetime.strptime(raw_iso, "%Y-%m-%dT%H:%M:%SZ")
         # Restamos 5 horas para zona Monterrey
-        dt_mty = dt_utc - timedelta(hours=5)
+        dt_mty = dt_utc - timedelta(hours=6)
         meses = [
             "enero", "febrero", "marzo", "abril", "mayo", "junio",
             "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
@@ -286,7 +286,7 @@ def verificacion_publica(doc_id):
         <!-- Encabezado blanco con logos separados por márgenes -->
         <header>
           <img src="{logo_tec}" alt="Logo TECNOLOGICO DE MONTERREY" />
-          <h2>CASA MONARCA</h2>
+          <h2>SELLO MONARCA</h2>
           <img src="{logo_casa}" alt="Logo CASA MONARCA" />
         </header>
 
@@ -371,14 +371,11 @@ def download_pdf(doc_id):
 @app.route("/verify-ui")
 def verify_ui():
     """
-    Página Drag & Drop para verificar un PDF sellado.
-    - Header blanco con logos.
-    - Tarjeta blanca centrada.
-    - Drop zone punteada.
-    - Al soltar el PDF: se muestra ✅ VÁLIDO o ❌ NO VÁLIDO.
-    - Tabla con metadatos (ÁREA, Document ID, Nombre original, Subido por, Fecha).
+    Página Drag & Drop (o clic) para verificar un PDF sellado.
+    - Permite arrastrar el archivo o hacer clic para abrir selector.
+    - Muestra ✅ VÁLIDO o ❌ NO VÁLIDO con tabla de metadatos.
     """
-    # URL completa de tu endpoint /verify
+    # URL de tu endpoint /verify
     verify_api_url = request.url_root.rstrip("/") + "/verify"
 
     html = f"""
@@ -389,14 +386,15 @@ def verify_ui():
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>Verificar PDF Sellado</title>
         <style>
-          /* Reset sencillo */
+          /* Reset básico */
           * {{ margin: 0; padding: 0; box-sizing: border-box; }}
           body {{
             background: #f0f2f5;
             font-family: 'Segoe UI', sans-serif;
             color: #2c2c2c;
           }}
-          /* Header blanco con logos y título */
+
+          /* Header blanco */
           header {{
             background: white;
             padding: 15px 40px;
@@ -433,14 +431,20 @@ def verify_ui():
             padding: 25px 30px;
           }}
 
-          /* Título de la tarjeta */
+          /* Título y subtítulo */
           .tarjeta h1 {{
             font-size: 1.6rem;
-            margin-bottom: 15px;
+            margin-bottom: 5px;
+            text-align: center;
+          }}
+          .tarjeta p.subtitulo {{
+            font-size: 1rem;
+            color: #555;
+            margin-bottom: 20px;
             text-align: center;
           }}
 
-          /* Drop Zone */
+          /* Drop Zone con estado híbrido */
           #dropZone {{
             height: 200px;
             border: 3px dashed #ccc;
@@ -449,14 +453,22 @@ def verify_ui():
             align-items: center;
             justify-content: center;
             color: #777;
-            font-size: 1rem;
-            transition: border-color 0.2s, color 0.2s;
+            font-size: 1.1rem;
+            transition: border-color 0.2s, color 0.2s, background 0.2s;
             margin-bottom: 25px;
+            cursor: pointer;
             user-select: none;
+            background: #fafafa;
           }}
           #dropZone.dragover {{
             border-color: #00539c;
             color: #00539c;
+            background: #e8f0fe;
+          }}
+
+          /* Input file oculto (se dispara al hacer clic en el dropZone) */
+          input[type="file"] {{
+            display: none;
           }}
 
           /* Estado de validación */
@@ -510,10 +522,10 @@ def verify_ui():
       </head>
 
       <body>
-        <!-- Header con logos y título -->
+        <!-- Header con logos -->
         <header>
           <img src="{url_for('static', filename='logo_tec.png')}" alt="Logo TECNOLOGICO DE MONTERREY" />
-          <h2>VERIFICAR PDF SELLADO</h2>
+          <h2>SELLO MONARCA</h2>
           <img src="{url_for('static', filename='logo_casa_monarca.png')}" alt="Logo CASA MONARCA" />
         </header>
 
@@ -521,8 +533,18 @@ def verify_ui():
         <main>
           <div class="tarjeta">
             <div class="contenido">
-              <h1>Arrastra tu PDF Sellado</h1>
-              <div id="dropZone">Suelta aquí el archivo PDF</div>
+              <h1>Arrastra o haz clic para subir tu PDF</h1>
+              <p class="subtitulo">Sólo archivos .pdf válidos</p>
+
+              <!-- Drop Zone híbrido -->
+              <div id="dropZone">
+                📁 Selecciona o arrastra aquí tu PDF
+              </div>
+
+              <!-- Input file oculto -->
+              <input type="file" id="fileInput" accept="application/pdf" />
+
+              <!-- Resultado (estado + metadatos) -->
               <div id="result"></div>
             </div>
           </div>
@@ -536,23 +558,14 @@ def verify_ui():
         <script>
           const dropZone = document.getElementById('dropZone');
           const resultDiv = document.getElementById('result');
+          const fileInput = document.getElementById('fileInput');
           const apiURL = "{verify_api_url}";
 
-          dropZone.addEventListener('dragover', e => {{
-            e.preventDefault();
-            dropZone.classList.add('dragover');
-          }});
-          dropZone.addEventListener('dragleave', () => {{
-            dropZone.classList.remove('dragover');
-          }});
-          dropZone.addEventListener('drop', async e => {{
-            e.preventDefault();
-            dropZone.classList.remove('dragover');
-
-            const file = e.dataTransfer.files[0];
-            // Verificar que sea PDF
+          // Función que maneja un archivo PDF: lo envía a /verify y muestra el resultado
+          async function handleFile(file) {{
+            // Validar tipo
             if (!file || file.type !== "application/pdf") {{
-              resultDiv.innerHTML = "<p style='color:red; font-weight:bold;'>Por favor, sube un archivo PDF valido.</p>";
+              resultDiv.innerHTML = "<p style='color:red; font-weight:bold;'>Por favor, sube un archivo PDF válido.</p>";
               return;
             }}
 
@@ -569,23 +582,22 @@ def verify_ui():
               const data = await resp.json();
 
               if (data.valid) {{
-                // Mostrar estado VÁLIDO
+                // Construir tabla de metadatos formateada
                 let html = "<div class='estado valido'>✅ VÁLIDO</div>";
                 html += "<table class='tabla-meta'><tbody>";
 
-                // Campos que queremos mostrar
+                // Los campos que mostraremos
                 const campos = {{
                   "Área": data.meta.area || "—",
                   "Document ID": data.meta.id || "—",
                   "Nombre original": data.meta.original_filename || "—",
                   "Subido por": data.meta.uploader || "—",
-                  // Formatear la fecha en hora de Monterrey
+                  // Formatear fecha UTC->MTY
                   "Fecha": (() => {{
                     const raw = data.meta.uploaded_at || "";
                     try {{
                       const dtUtc = new Date(raw);
-                      // Restar 5 horas a UTC
-                      dtUtc.setHours(dtUtc.getHours() - 5);
+                      dtUtc.setHours(dtUtc.getHours());
                       const meses = [
                         "enero","febrero","marzo","abril","mayo","junio",
                         "julio","agosto","septiembre","octubre","noviembre","diciembre"
@@ -596,7 +608,9 @@ def verify_ui():
                       const h = String(dtUtc.getHours()).padStart(2, "0");
                       const mi = String(dtUtc.getMinutes()).padStart(2, "0");
                       return `${{d}} ${{m}} ${{a}}, ${{h}}:${{mi}} (MTY)`;
-                    }} catch {{ return raw; }}
+                    }} catch {{
+                      return raw;
+                    }}
                   }})()
                 }};
 
@@ -606,19 +620,45 @@ def verify_ui():
                 html += "</tbody></table>";
                 resultDiv.innerHTML = html;
               }} else {{
-                // NO VÁLIDO
                 resultDiv.innerHTML = "<div class='estado invalido'>❌ NO VÁLIDO</div>";
               }}
             }} catch (err) {{
               console.error(err);
               resultDiv.innerHTML = "<p style='color:red; font-weight:bold;'>Error al conectar con el servidor.</p>";
             }}
+          }}
+
+          // Drag & drop: cambiar estilo al pasar archivo
+          dropZone.addEventListener('dragover', e => {{
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+          }});
+          dropZone.addEventListener('dragleave', () => {{
+            dropZone.classList.remove('dragover');
+          }});
+          dropZone.addEventListener('drop', e => {{
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            handleFile(file);
+          }});
+
+          // Al hacer clic en dropZone, abre fileInput
+          dropZone.addEventListener('click', () => {{
+            fileInput.click();
+          }});
+
+          // Cuando seleccionan archivo con fileInput
+          fileInput.addEventListener('change', () => {{
+            const file = fileInput.files[0];
+            handleFile(file);
           }});
         </script>
       </body>
     </html>
     """
     return html
+
 
 
 if __name__ == "__main__":
