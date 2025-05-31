@@ -15,6 +15,10 @@ from flask import Flask, request, send_file, render_template_string, abort, json
 import datetime as dt
 from zoneinfo import ZoneInfo
 
+from hashlib import sha256
+from sello_monarca.sello import verify, META_KEY
+from datetime import timedelta
+
 
 PRIVATE_KEY = cargar_llave_privada("keys/private_key.pem", b"secreto")
 PUBLIC_KEY  = cargar_llave_publica("keys/public_key.pem")
@@ -88,28 +92,35 @@ def verify_document():
 
 @app.route("/v/<doc_id>")
 def verificacion_publica(doc_id):
+    """
+    Muestra una página profesional y limpia para verificar un PDF sellado.
+    - Oculta la firma, muestra solo los campos relevantes.
+    - Logos con márgenes, tarjeta blanca centrada.
+    - Fecha en hora de Monterrey (UTC-5).
+    """
+    # 1) Ruta de disco al PDF por doc_id
     pdf_path = os.path.join(STORAGE_DIR, f"{doc_id}.pdf")
     if not os.path.exists(pdf_path):
         return "Documento no encontrado", 404
 
+    # 2) Leer el PDF y extraer metadata + verificación
     with open(pdf_path, "rb") as f:
         pdf_bytes = f.read()
     es_valido, meta = verify(pdf_bytes, PUBLIC_KEY)
 
-    # Nombre original y download friendly
+    # 3) Montar el nombre original y generar nombre de descarga si lo necesitas
     original = meta.get("original_filename", doc_id)
     base, ext = os.path.splitext(original)
     download_name = f"{base}_sellado{ext}"
 
-    # ───────── Ajuste simple de fecha (UTC → Monterrey UTC−5 sin depende de zoneinfo) ─────────
+    # 4) Formatear la fecha en hora de Monterrey (UTC-5), mes en español
     raw_iso = meta.get("uploaded_at", "")
-    fecha_amigable = raw_iso  # por defecto, si algo falla
+    fecha_amigable = raw_iso  # fallback si algo falla
     try:
-        # 1) Parsear la cadena ISO con “Z” al final
+        # Parseamos la cadena ISO "2025-05-30T23:12:35Z"
         dt_utc = dt.datetime.strptime(raw_iso, "%Y-%m-%dT%H:%M:%SZ")
-        # 2) Restar 5 horas para pasar a hora de Monterrey (UTC−5)
-        dt_mty = dt_utc - dt.timedelta(hours=6)
-        # 3) Mapear mes en español
+        # Restamos 5 horas para zona Monterrey
+        dt_mty = dt_utc - timedelta(hours=5)
         meses = [
             "enero", "febrero", "marzo", "abril", "mayo", "junio",
             "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
@@ -119,97 +130,200 @@ def verificacion_publica(doc_id):
         ano = dt_mty.year
         hora = dt_mty.hour
         minuto = dt_mty.minute
-        # 4) Formato “30 mayo 2025, 18:50 (MTY)”
         fecha_amigable = f"{dia} {mes} {ano}, {hora:02d}:{minuto:02d} (MTY)"
     except Exception:
         pass
 
-
-
+    # 5) Rutas a los logos (debes tener estos archivos en static/)
     logo_tec  = url_for('static', filename='logo_tec.png')
     logo_casa = url_for('static', filename='logo_casa_monarca.png')
 
+    # 6) Construir solo los metadatos que queremos mostrar (sin signature ni verify_url)
+    metadatos_mostrar = {
+        "Área": meta.get("area", "—"),
+        "Document ID": meta.get("id", doc_id),
+        "Nombre original": meta.get("original_filename", "—"),
+        "Subido por": meta.get("uploader", "—"),
+        "Fecha": fecha_amigable
+    }
+
+    # 7) HTML + CSS inline: diseño limpio, tarjeta centrada
     html = f"""
     <!DOCTYPE html>
     <html lang="es">
-      <head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+      <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>Verificación Casa Monarca</title>
         <style>
-          body {{ margin:0; padding:0; background:#f0f2f5; font-family:'Segoe UI',sans-serif; color:#333; }}
+          /* ----------------- Reset básico ----------------- */
+          * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+          body {{
+            background: #f0f2f5;
+            font-family: 'Segoe UI', sans-serif;
+            color: #2c2c2c;
+          }}
+          a {{ text-decoration: none; color: inherit; }}
+
+          /* ----------------- Encabezado ----------------- */
           header {{
             background: white;
-            padding: 15px 20px;
+            padding: 15px 40px;
             display: flex;
             align-items: center;
             justify-content: space-between;
             border-bottom: 1px solid #e0e0e0;
           }}
-          header img {{ height: 40px; }}
-          header h2 {{ margin:0; font-size:1.2rem; color:#333; letter-spacing:.05em; }}
+          header img {{
+            height: 45px;
+            margin: 0 10px;
+          }}
+          header h2 {{
+            font-size: 1.3rem;
+            color: #1a1a1a;
+            letter-spacing: 0.05em;
+          }}
+
+          /* ----------------- Contenedor principal ----------------- */
           main {{
-            max-width:800px;
-            margin:30px auto;
-            background:white;
-            border-radius:8px;
-            box-shadow:0 4px 12px rgba(0,0,0,0.1);
-            overflow:hidden;
+            display: flex;
+            justify-content: center;
+            margin: 40px 20px;
           }}
-          .content {{ padding:20px; }}
-          .status {{
-            display:inline-block;
-            padding:10px 15px;
-            border-radius:4px;
-            margin-bottom:20px;
-            font-weight:bold;
+          .tarjeta {{
+            background: white;
+            width: 100%;
+            max-width: 700px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            overflow: hidden;
           }}
-          .valido {{ background:#d4edda; color:#155724; }}
-          .invalido {{ background:#f8d7da; color:#721c24; }}
-          h1 {{ margin-top:0; font-size:1.6rem; }}
-          .metadata p {{ margin:6px 0; font-size:.95rem; }}
-          iframe {{ width:100%; height:500px; border:none; display:block; margin:20px 0; }}
-          .download-btn {{ text-align:center; margin-bottom:20px; }}
-          .download-btn a {{ text-decoration:none; }}
-          .download-btn button {{
+          .tarjeta .contenido {{
+            padding: 25px 30px;
+          }}
+
+          /* ----------------- Título y estado ----------------- */
+          .tarjeta h1 {{
+            font-size: 1.6rem;
+            margin-bottom: 15px;
+            text-align: center;
+          }}
+          .estado {{
+            display: inline-block;
+            padding: 10px 16px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 1rem;
+            margin-bottom: 20px;
+          }}
+          .estado.valido {{
+            background: #d4edda;
+            color: #155724;
+          }}
+          .estado.invalido {{
+            background: #f8d7da;
+            color: #721c24;
+          }}
+
+          /* ----------------- Tabla de metadatos ----------------- */
+          .tabla-meta {{
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0 30px;
+          }}
+          .tabla-meta th, .tabla-meta td {{
+            border: 1px solid #d0d0d0;
+            padding: 10px 12px;
+            text-align: left;
+          }}
+          .tabla-meta th {{
+            background: #00539c;
+            color: white;
+            font-weight: normal;
+            width: 35%;
+          }}
+          .tabla-meta td {{ background: #fafafa; }}
+
+          /* ----------------- Visor PDF ----------------- */
+          .visor-pdf {{
+            width: 100%;
+            height: 500px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin-bottom: 25px;
+          }}
+
+          /* ----------------- Botón de descarga ----------------- */
+          .boton-descarga {{
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+          }}
+          .boton-descarga a {{
             background: #FF584D;
             color: white;
-            border: none;
-            padding: 12px 25px;
+            padding: 12px 28px;
             border-radius: 4px;
             font-size: 1rem;
-            cursor: pointer;
-            transition: background .2s;
+            font-weight: bold;
+            transition: background 0.2s;
           }}
-          .download-btn button:hover {{ background: #e74c3c; }}
-          footer {{ text-align:center; padding:15px; font-size:.85rem; color:#777; background:#fafafa; }}
+          .boton-descarga a:hover {{
+            background: #e74c3c;
+          }}
+
+          /* ----------------- Pie de página ----------------- */
+          footer {{
+            text-align: center;
+            padding: 15px 0;
+            font-size: 0.85rem;
+            color: #666;
+            background: #fafafa;
+          }}
         </style>
       </head>
       <body>
+        <!-- Encabezado blanco con logos separados por márgenes -->
         <header>
-          <img src="{logo_tec}" alt="Logo TECNOLOGICO DE MONTERREY">
-          <h2>SELLO MONARCA</h2>
-          <img src="{logo_casa}" alt="Logo Casa Monarca">
+          <img src="{logo_tec}" alt="Logo TECNOLOGICO DE MONTERREY" />
+          <h2>CASA MONARCA</h2>
+          <img src="{logo_casa}" alt="Logo CASA MONARCA" />
         </header>
+
+        <!-- Contenedor principal centrado -->
         <main>
-          <div class="content">
-            <h1>Verificación de Documento</h1>
-            <div class="status {'valido' if es_valido else 'invalido'}">
-              {'✅ VÁLIDO' if es_valido else '❌ NO VÁLIDO'}
-            </div>
-            <div class="metadata">
-              <p><strong>Document ID:</strong> {doc_id}</p>
-              <p><strong>Nombre original:</strong> {original}</p>
-              <p><strong>Subido por:</strong> {meta.get('uploader','—')}</p>
-              <p><strong>Área:</strong> {meta.get('area','—')}</p>
-              <p><strong>Fecha:</strong> {fecha_amigable}</p>
-            </div>
-            <iframe src="/file/{doc_id}"></iframe>
-            <div class="download-btn">
-              <a href="/download/{doc_id}">
-                <button>📥 Descargar "{download_name}"</button>
-              </a>
+          <div class="tarjeta">
+            <div class="contenido">
+              <h1>Verificación de Documento</h1>
+              <!-- Mostrar estado (VÁLIDO o NO VÁLIDO) -->
+              <div class="estado {'valido' if es_valido else 'invalido'}">
+                {'✅ VÁLIDO' if es_valido else '❌ NO VÁLIDO'}
+              </div>
+
+              <!-- Tabla con metadatos relevantes, sin mostrar signature ni verify_url -->
+              <table class="tabla-meta">
+                <tbody>
+                  {"".join([
+                    f"<tr><th>{campo}</th><td>{valor}</td></tr>"
+                    for campo, valor in metadatos_mostrar.items()
+                  ])}
+                </tbody>
+              </table>
+
+              <!-- Visor PDF incrustado en un iframe -->
+              <iframe class="visor-pdf" src="/file/{doc_id}"></iframe>
+
+              <!-- Botón de descarga con nombre amigable -->
+              <div class="boton-descarga">
+                <a href="/download/{doc_id}" download="{download_name}">
+                  📥 Descargar "{download_name}"
+                </a>
+              </div>
             </div>
           </div>
         </main>
+
+        <!-- Pie de página -->
         <footer>
           &copy; {dt.datetime.utcnow().year} CASA MONARCA • TECNOLOGICO DE MONTERREY
         </footer>
@@ -218,17 +332,27 @@ def verificacion_publica(doc_id):
     """
     return html
 
+@app.route("/file/<doc_id>")
+def serve_pdf(doc_id):
+    """
+    Sirve el PDF (sin forzar nombre). El nombre correcto para descarga
+    se manejará en /download/<doc_id>.
+    """
+    pdf_path = os.path.join(STORAGE_DIR, f"{doc_id}.pdf")
+    if not os.path.exists(pdf_path):
+        abort(404)
+    return send_file(pdf_path, mimetype="application/pdf")
 
 @app.route("/download/<doc_id>")
 def download_pdf(doc_id):
     """
-    Sirve el PDF como adjunto forzando el nombre de descarga.
+    Envía el PDF forzando la descarga con nombre amigable.
     """
     pdf_path = os.path.join(STORAGE_DIR, f"{doc_id}.pdf")
     if not os.path.exists(pdf_path):
         abort(404)
 
-    # Recupera metadatos para obtener el nombre original
+    # Leer los metadatos para obtener el nombre original
     with open(pdf_path, "rb") as f:
         pdf_bytes = f.read()
     _, meta = verify(pdf_bytes, PUBLIC_KEY)
@@ -237,7 +361,6 @@ def download_pdf(doc_id):
     base, ext = os.path.splitext(original)
     download_name = f"{base}_sellado{ext}"
 
-    # Envía el PDF como attachment con el nombre correcto
     return send_file(
         pdf_path,
         mimetype="application/pdf",
@@ -245,21 +368,258 @@ def download_pdf(doc_id):
         download_name=download_name
     )
 
-
-@app.route("/file/<doc_id>")
-def serve_pdf(doc_id):
+@app.route("/verify-ui")
+def verify_ui():
     """
-    Sirve el PDF salvo con nombre {doc_id}.pdf.
-    El navegador lo mostrará o descargará según el link <a download="...">cuyo nombre
-    decidimos en /v/<doc_id>.
+    Página Drag & Drop para verificar un PDF sellado.
+    - Header blanco con logos.
+    - Tarjeta blanca centrada.
+    - Drop zone punteada.
+    - Al soltar el PDF: se muestra ✅ VÁLIDO o ❌ NO VÁLIDO.
+    - Tabla con metadatos (ÁREA, Document ID, Nombre original, Subido por, Fecha).
     """
-    pdf_path = os.path.join(STORAGE_DIR, f"{doc_id}.pdf")
-    if not os.path.exists(pdf_path):
-        abort(404)
+    # URL completa de tu endpoint /verify
+    verify_api_url = request.url_root.rstrip("/") + "/verify"
 
-    # Para que el navegador no cambie el nombre, NO fijamos download_name aquí.
-    # El atributo download se envía en <a download="..."> del HTML.
-    return send_file(pdf_path, mimetype="application/pdf")
+    html = f"""
+    <!DOCTYPE html>
+    <html lang="es">
+      <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Verificar PDF Sellado</title>
+        <style>
+          /* Reset sencillo */
+          * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+          body {{
+            background: #f0f2f5;
+            font-family: 'Segoe UI', sans-serif;
+            color: #2c2c2c;
+          }}
+          /* Header blanco con logos y título */
+          header {{
+            background: white;
+            padding: 15px 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #e0e0e0;
+          }}
+          header img {{
+            height: 45px;
+            margin: 0 10px;
+          }}
+          header h2 {{
+            font-size: 1.3rem;
+            color: #1a1a1a;
+            letter-spacing: 0.05em;
+          }}
+
+          /* Contenedor principal centrado */
+          main {{
+            display: flex;
+            justify-content: center;
+            margin: 40px 20px;
+          }}
+          .tarjeta {{
+            background: white;
+            width: 100%;
+            max-width: 700px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            overflow: hidden;
+          }}
+          .tarjeta .contenido {{
+            padding: 25px 30px;
+          }}
+
+          /* Título de la tarjeta */
+          .tarjeta h1 {{
+            font-size: 1.6rem;
+            margin-bottom: 15px;
+            text-align: center;
+          }}
+
+          /* Drop Zone */
+          #dropZone {{
+            height: 200px;
+            border: 3px dashed #ccc;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #777;
+            font-size: 1rem;
+            transition: border-color 0.2s, color 0.2s;
+            margin-bottom: 25px;
+            user-select: none;
+          }}
+          #dropZone.dragover {{
+            border-color: #00539c;
+            color: #00539c;
+          }}
+
+          /* Estado de validación */
+          .estado {{
+            display: inline-block;
+            padding: 10px 16px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 1rem;
+            margin-bottom: 20px;
+            text-align: center;
+          }}
+          .valido {{
+            background: #d4edda;
+            color: #155724;
+          }}
+          .invalido {{
+            background: #f8d7da;
+            color: #721c24;
+          }}
+
+          /* Tabla de metadatos */
+          .tabla-meta {{
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0 30px;
+          }}
+          .tabla-meta th, .tabla-meta td {{
+            border: 1px solid #d0d0d0;
+            padding: 10px 12px;
+            text-align: left;
+          }}
+          .tabla-meta th {{
+            background: #00539c;
+            color: white;
+            font-weight: normal;
+            width: 35%;
+          }}
+          .tabla-meta td {{ background: #fafafa; }}
+
+          /* Pie de página */
+          footer {{
+            text-align: center;
+            padding: 15px 0;
+            font-size: 0.85rem;
+            color: #666;
+            background: #fafafa;
+            margin-top: 40px;
+          }}
+        </style>
+      </head>
+
+      <body>
+        <!-- Header con logos y título -->
+        <header>
+          <img src="{url_for('static', filename='logo_tec.png')}" alt="Logo TECNOLOGICO DE MONTERREY" />
+          <h2>VERIFICAR PDF SELLADO</h2>
+          <img src="{url_for('static', filename='logo_casa_monarca.png')}" alt="Logo CASA MONARCA" />
+        </header>
+
+        <!-- Contenedor principal -->
+        <main>
+          <div class="tarjeta">
+            <div class="contenido">
+              <h1>Arrastra tu PDF Sellado</h1>
+              <div id="dropZone">Suelta aquí el archivo PDF</div>
+              <div id="result"></div>
+            </div>
+          </div>
+        </main>
+
+        <!-- Pie de página -->
+        <footer>
+          &copy; {dt.datetime.utcnow().year} CASA MONARCA • TECNOLOGICO DE MONTERREY
+        </footer>
+
+        <script>
+          const dropZone = document.getElementById('dropZone');
+          const resultDiv = document.getElementById('result');
+          const apiURL = "{verify_api_url}";
+
+          dropZone.addEventListener('dragover', e => {{
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+          }});
+          dropZone.addEventListener('dragleave', () => {{
+            dropZone.classList.remove('dragover');
+          }});
+          dropZone.addEventListener('drop', async e => {{
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+
+            const file = e.dataTransfer.files[0];
+            // Verificar que sea PDF
+            if (!file || file.type !== "application/pdf") {{
+              resultDiv.innerHTML = "<p style='color:red; font-weight:bold;'>Por favor, sube un archivo PDF valido.</p>";
+              return;
+            }}
+
+            resultDiv.innerHTML = "<p>Verificando el documento…</p>";
+
+            const formData = new FormData();
+            formData.append("file", file);
+
+            try {{
+              const resp = await fetch(apiURL, {{
+                method: "POST",
+                body: formData
+              }});
+              const data = await resp.json();
+
+              if (data.valid) {{
+                // Mostrar estado VÁLIDO
+                let html = "<div class='estado valido'>✅ VÁLIDO</div>";
+                html += "<table class='tabla-meta'><tbody>";
+
+                // Campos que queremos mostrar
+                const campos = {{
+                  "Área": data.meta.area || "—",
+                  "Document ID": data.meta.id || "—",
+                  "Nombre original": data.meta.original_filename || "—",
+                  "Subido por": data.meta.uploader || "—",
+                  // Formatear la fecha en hora de Monterrey
+                  "Fecha": (() => {{
+                    const raw = data.meta.uploaded_at || "";
+                    try {{
+                      const dtUtc = new Date(raw);
+                      // Restar 5 horas a UTC
+                      dtUtc.setHours(dtUtc.getHours() - 5);
+                      const meses = [
+                        "enero","febrero","marzo","abril","mayo","junio",
+                        "julio","agosto","septiembre","octubre","noviembre","diciembre"
+                      ];
+                      const d = dtUtc.getDate();
+                      const m = meses[dtUtc.getMonth()];
+                      const a = dtUtc.getFullYear();
+                      const h = String(dtUtc.getHours()).padStart(2, "0");
+                      const mi = String(dtUtc.getMinutes()).padStart(2, "0");
+                      return `${{d}} ${{m}} ${{a}}, ${{h}}:${{mi}} (MTY)`;
+                    }} catch {{ return raw; }}
+                  }})()
+                }};
+
+                for (const [k,v] of Object.entries(campos)) {{
+                  html += `<tr><th>${{k}}</th><td>${{v}}</td></tr>`;
+                }}
+                html += "</tbody></table>";
+                resultDiv.innerHTML = html;
+              }} else {{
+                // NO VÁLIDO
+                resultDiv.innerHTML = "<div class='estado invalido'>❌ NO VÁLIDO</div>";
+              }}
+            }} catch (err) {{
+              console.error(err);
+              resultDiv.innerHTML = "<p style='color:red; font-weight:bold;'>Error al conectar con el servidor.</p>";
+            }}
+          }});
+        </script>
+      </body>
+    </html>
+    """
+    return html
+
 
 if __name__ == "__main__":
     app.run(debug=True)
