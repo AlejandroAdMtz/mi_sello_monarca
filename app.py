@@ -19,9 +19,18 @@ from hashlib import sha256
 from sello_monarca.sello import verify, META_KEY
 from datetime import timedelta
 
+from dotenv import load_dotenv
+load_dotenv(override=True)
 
-PRIVATE_KEY = cargar_llave_privada("keys/private_key.pem", b"secreto")
-PUBLIC_KEY  = cargar_llave_publica("keys/public_key.pem")
+PRIVATE_KEY_ENV = os.getenv("PRIVATE_KEY_PEM")
+PUBLIC_KEY_ENV = os.getenv("PUBLIC_KEY_PEM")
+
+
+from sello_monarca.llaves import cargar_llave_privada_desde_env, cargar_llave_publica_desde_env
+
+PRIVATE_KEY = cargar_llave_privada_desde_env(PRIVATE_KEY_ENV, password=b"secreto")
+PUBLIC_KEY = cargar_llave_publica_desde_env(PUBLIC_KEY_ENV)
+
 
 STORAGE_DIR = "storage"
 os.makedirs(STORAGE_DIR, exist_ok=True)
