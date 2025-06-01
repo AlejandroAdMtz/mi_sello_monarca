@@ -2,17 +2,13 @@ __pycache__/
 *.pyc
 *.sig
 *.pdf
-
 # Ignorar llaves privadas
 keys/
 *.pem
-
 # Ignorar archivos de entorno
 .env
-
 # Ignorar carpeta de almacenamiento local (en producción no usas esto)
 storage/
-
 # Ignorar archivos de VS Code o Python virtualenv
 .vscode/
 .venv/

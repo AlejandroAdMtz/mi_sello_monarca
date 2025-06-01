@@ -11,7 +11,6 @@ from flask import (
 )
 from sello_monarca.sello import sell, verify
 from sello_monarca.llaves import cargar_llave_privada, cargar_llave_publica
-from flask import Flask, request, send_file, render_template_string, abort, jsonify, url_for
 import datetime as dt
 from zoneinfo import ZoneInfo
 
@@ -20,18 +19,27 @@ from sello_monarca.sello import verify, META_KEY
 from datetime import timedelta
 
 from dotenv import load_dotenv
+
+
 load_dotenv(override=True)
 
+# Carga de llaves desde .env
 PRIVATE_KEY_ENV = os.getenv("PRIVATE_KEY_PEM")
-PUBLIC_KEY_ENV = os.getenv("PUBLIC_KEY_PEM")
+PUBLIC_KEY_ENV  = os.getenv("PUBLIC_KEY_PEM")
 
-
-from sello_monarca.llaves import cargar_llave_privada_desde_env, cargar_llave_publica_desde_env
+from sello_monarca.llaves import cargar_llave_privada_desde_env,  cargar_llave_publica_desde_env
 
 PRIVATE_KEY = cargar_llave_privada_desde_env(PRIVATE_KEY_ENV, password=b"secreto")
-PUBLIC_KEY = cargar_llave_publica_desde_env(PUBLIC_KEY_ENV)
+PUBLIC_KEY  = cargar_llave_publica_desde_env(PUBLIC_KEY_ENV)
 
+# Resto de variables
+SP_SITE      = os.getenv("SP_SITE")
+SP_DOC_LIB   = os.getenv("SP_DOC_LIB")
+SP_LIST      = os.getenv("SP_LIST")
+API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:5000")
+TZ           = os.getenv("TZ", "America/Monterrey")
 
+# Crear carpeta local para PDFs
 STORAGE_DIR = "storage"
 os.makedirs(STORAGE_DIR, exist_ok=True)
 
@@ -670,5 +678,7 @@ def verify_ui():
 
 
 
+
 if __name__ == "__main__":
-    app.run(debug=True)
+  port = int(os.getenv("PORT", 5000))
+  app.run(host="0.0.0.0", port=port)
