@@ -173,16 +173,21 @@ def verificacion_publica(doc_id):
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>Verificación Casa Monarca</title>
         <style>
-          /* ----------------- Reset básico ----------------- */
-          * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+          * {{
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }}
           body {{
             background: #f0f2f5;
             font-family: 'Segoe UI', sans-serif;
             color: #2c2c2c;
           }}
-          a {{ text-decoration: none; color: inherit; }}
+          a {{
+            text-decoration: none;
+            color: inherit;
+          }}
 
-          /* ----------------- Encabezado ----------------- */
           header {{
             background: white;
             padding: 15px 40px;
@@ -190,22 +195,28 @@ def verificacion_publica(doc_id):
             align-items: center;
             justify-content: space-between;
             border-bottom: 1px solid #e0e0e0;
+            flex-wrap: wrap;
           }}
           header img {{
             height: 45px;
-            margin: 0 10px;
+            max-width: 100px;
+            object-fit: contain;
+            margin: 5px 10px;
           }}
           header h2 {{
             font-size: 1.3rem;
             color: #1a1a1a;
             letter-spacing: 0.05em;
+            text-align: center;
+            flex-grow: 1;
           }}
 
-          /* ----------------- Contenedor principal ----------------- */
           main {{
             display: flex;
             justify-content: center;
             margin: 40px 20px;
+            width: 100%;
+            padding: 0 10px;
           }}
           .tarjeta {{
             background: white;
@@ -219,19 +230,19 @@ def verificacion_publica(doc_id):
             padding: 25px 30px;
           }}
 
-          /* ----------------- Título y estado ----------------- */
           .tarjeta h1 {{
             font-size: 1.6rem;
-            margin-bottom: 15px;
+            margin-bottom: 25px;
             text-align: center;
           }}
           .estado {{
-            display: inline-block;
+            display: block;
+            text-align: center;
+            margin: 0 auto 20px auto;
             padding: 10px 16px;
             border-radius: 4px;
             font-weight: bold;
             font-size: 1rem;
-            margin-bottom: 20px;
           }}
           .estado.valido {{
             background: #d4edda;
@@ -242,11 +253,13 @@ def verificacion_publica(doc_id):
             color: #721c24;
           }}
 
-          /* ----------------- Tabla de metadatos ----------------- */
           .tabla-meta {{
             width: 100%;
             border-collapse: collapse;
             margin: 20px 0 30px;
+            display: block;
+            overflow-x: auto;
+            white-space: nowrap;
           }}
           .tabla-meta th, .tabla-meta td {{
             border: 1px solid #d0d0d0;
@@ -259,18 +272,19 @@ def verificacion_publica(doc_id):
             font-weight: normal;
             width: 35%;
           }}
-          .tabla-meta td {{ background: #fafafa; }}
+          .tabla-meta td {{
+            background: #fafafa;
+          }}
 
-          /* ----------------- Visor PDF ----------------- */
           .visor-pdf {{
             width: 100%;
+            max-width: 100%;
             height: 500px;
             border: 1px solid #ccc;
             border-radius: 4px;
             margin-bottom: 25px;
           }}
 
-          /* ----------------- Botón de descarga ----------------- */
           .boton-descarga {{
             display: flex;
             justify-content: center;
@@ -284,12 +298,12 @@ def verificacion_publica(doc_id):
             font-size: 1rem;
             font-weight: bold;
             transition: background 0.2s;
+            text-align: center;
           }}
           .boton-descarga a:hover {{
             background: #e74c3c;
           }}
 
-          /* ----------------- Pie de página ----------------- */
           footer {{
             text-align: center;
             padding: 15px 0;
@@ -297,27 +311,57 @@ def verificacion_publica(doc_id):
             color: #666;
             background: #fafafa;
           }}
+
+          @media (max-width: 600px) {{
+            body {{
+              font-size: 0.95rem;
+            }}
+            header {{
+              flex-direction: column;
+              align-items: center;
+              gap: 5px;
+              padding: 20px 10px;
+            }}
+            header img {{
+              height: 40px;
+            }}
+            header h2 {{
+              font-size: 1.1rem;
+              margin: 5px 0;
+            }}
+            .tarjeta .contenido {{
+              padding: 20px 15px;
+              font-size: 0.95rem;
+            }}
+            .tarjeta h1 {{
+              font-size: 1.3rem;
+            }}
+            .tabla-meta th,
+            .tabla-meta td {{
+              font-size: 0.85rem;
+            }}
+            .boton-descarga a {{
+              width: 100%;
+              padding: 12px;
+            }}
+          }}
         </style>
       </head>
       <body>
-        <!-- Encabezado blanco con logos separados por márgenes -->
         <header>
           <img src="{logo_tec}" alt="Logo TECNOLOGICO DE MONTERREY" />
           <h2>SELLO MONARCA</h2>
           <img src="{logo_casa}" alt="Logo CASA MONARCA" />
         </header>
 
-        <!-- Contenedor principal centrado -->
         <main>
           <div class="tarjeta">
             <div class="contenido">
               <h1>Verificación de Documento</h1>
-              <!-- Mostrar estado (VÁLIDO o NO VÁLIDO) -->
               <div class="estado {'valido' if es_valido else 'invalido'}">
                 {'✅ VÁLIDO' if es_valido else '❌ NO VÁLIDO'}
               </div>
 
-              <!-- Tabla con metadatos relevantes, sin mostrar signature ni verify_url -->
               <table class="tabla-meta">
                 <tbody>
                   {"".join([
@@ -327,10 +371,8 @@ def verificacion_publica(doc_id):
                 </tbody>
               </table>
 
-              <!-- Visor PDF incrustado en un iframe -->
               <iframe class="visor-pdf" src="/file/{doc_id}"></iframe>
 
-              <!-- Botón de descarga con nombre amigable -->
               <div class="boton-descarga">
                 <a href="/download/{doc_id}" download="{download_name}">
                   📥 Descargar "{download_name}"
@@ -340,7 +382,6 @@ def verificacion_publica(doc_id):
           </div>
         </main>
 
-        <!-- Pie de página -->
         <footer>
           &copy; {dt.datetime.utcnow().year} CASA MONARCA • TECNOLOGICO DE MONTERREY
         </footer>
@@ -348,6 +389,10 @@ def verificacion_publica(doc_id):
     </html>
     """
     return html
+
+
+
+
 
 @app.route("/file/<doc_id>")
 def serve_pdf(doc_id):
