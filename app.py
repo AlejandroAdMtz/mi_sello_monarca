@@ -237,6 +237,10 @@ def verify_document():
     if "file" not in request.files:
         return jsonify({"error": "Falta archivo"}), 400
     
+    pdf_bytes = request.files["file"].read()
+    es_valido, meta = verify(pdf_bytes, PUBLIC_KEY)
+    return jsonify({"valid": es_valido, "meta": meta})
+    
 @app.route("/v/<doc_id>")
 def verificacion_publica(doc_id):
     """
