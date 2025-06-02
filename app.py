@@ -98,20 +98,96 @@ def sign_document():
         "download_name": download_name
     }), 200
 
+@app.route("/sign-binary", methods=["POST"])
+def sign_binary():
+    if "file" not in request.files or "meta" not in request.form:
+        return jsonify({"error": "Falta archivo o metadatos"}), 400
 
-@app.route("/verify", methods=["POST"])
-def verify_document():
-    """
-    Recibe multipart/form-data:
-    - file: PDF que incluye metadata + firma + página QR
-    Devuelve JSON { valid: true/false, meta: {...} }
-    """
-    if "file" not in request.files:
-        return jsonify({"error": "Falta archivo"}), 400
+    pdf_bytes  = request.files["file"].read()
+    user_meta  = json.loads(request.form["meta"])
 
-    pdf_bytes = request.files["file"].read()
-    es_valido, meta = verify(pdf_bytes, PUBLIC_KEY)
-    return jsonify({"valid": es_valido, "meta": meta})
+    # 1. Sellar (sin guardar a disco)
+    pdf_sellado_bytes, doc_id = sell(
+        pdf_bytes,
+        user_meta,
+        PRIVATE_KEY,
+        base_url=request.url_root + "v/"
+    )
+
+    # 2. Construir headers que el Flow llenará en SharePoint
+    headers = {
+        # nombre “bonito” que guardaremos como archivo
+        "X-Download-Name": f"{os.path.splitext(user_meta['original_filename'])[0]}_sellado.pdf",
+        # ID interno del documento
+        "X-Doc-ID":        doc_id,
+        # URL pública de verificación (para la columna VerifyURL)
+        "X-Verify-URL":    request.url_root + f"v/{doc_id}",
+        # Fecha ISO (para UploadedAt)
+        "X-Uploaded-At":   dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        # Propiedades visibles
+        "X-Uploader":      user_meta["uploader"],
+        "X-Area":          user_meta["area"],
+        "X-Original-Filename": user_meta["original_filename"],
+        # Content-Disposition para que cURL/Flow sepa el nombre sugerido
+        "Content-Disposition": f'attachment; filename="{doc_id}.pdf"'
+    }
+
+    # 3. Responder el PDF sellado como binario
+    return pdf_sellado_bytes, 200, headers
+
+
+import base64
+
+@app.route("/sign-json", methods=["POST"])
+def sign_json():
+    if not request.is_json:
+        return jsonify({"error": "Solo se acepta JSON"}), 400
+
+    data = request.get_json()
+
+    # Campos requeridos
+    try:
+        file_b64   = data["file_base64"]
+        uploader   = data["uploader"]
+        area       = data["area"]
+        orig_name  = data["original_filename"]
+    except KeyError as e:
+        return jsonify({"error": f"Falta campo {e}"}), 400
+
+    # 1) Decodifica el PDF
+    try:
+        pdf_bytes = base64.b64decode(file_b64)
+    except Exception:
+        return jsonify({"error": "base64 inválido"}), 400
+
+    user_meta = {
+        "uploader": uploader,
+        "area": area,
+        "original_filename": orig_name
+    }
+
+    # 2) Firma
+    pdf_sellado_bytes, doc_id = sell(
+        pdf_bytes,
+        user_meta,
+        PRIVATE_KEY,
+        base_url=request.url_root + "v/"
+    )
+
+    # 3) Cabezeras para el Flow
+    headers = {
+        "X-Doc-ID":            doc_id,
+        "X-Verify-URL":        request.url_root + f"v/{doc_id}",
+        "X-Uploader":          uploader,
+        "X-Area":              area,
+        "X-Original-Filename": orig_name,
+        "X-Uploaded-At":       dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "X-Download-Name":     f"{os.path.splitext(orig_name)[0]}_sellado.pdf",
+        "Content-Disposition": f'attachment; filename="{doc_id}.pdf"'
+    }
+
+    return pdf_sellado_bytes, 200, headers
+
 
 @app.route("/v/<doc_id>")
 def verificacion_publica(doc_id):
