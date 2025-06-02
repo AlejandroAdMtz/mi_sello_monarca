@@ -140,9 +140,10 @@ import base64
 
 @app.route("/sign-json", methods=["POST"])
 def sign_json():
+    """""
     if not request.is_json:
         return jsonify({"error": "Solo se acepta JSON"}), 400
-
+    """""
     data = request.get_json()
 
     # Campos requeridos
