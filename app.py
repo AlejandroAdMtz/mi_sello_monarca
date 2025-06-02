@@ -227,7 +227,16 @@ def sign_binary_body():
     }
     return pdf_sellado_bytes, 200, headers
 
-
+@app.route("/verify", methods=["POST"])
+def verify_document():
+    """
+    Recibe multipart/form-data:
+    - file: PDF que incluye metadata + firma + página QR
+    Devuelve JSON { valid: true/false, meta: {...} }
+    """
+    if "file" not in request.files:
+        return jsonify({"error": "Falta archivo"}), 400
+    
 @app.route("/v/<doc_id>")
 def verificacion_publica(doc_id):
     """
