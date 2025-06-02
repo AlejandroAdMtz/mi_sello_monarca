@@ -45,6 +45,10 @@ os.makedirs(STORAGE_DIR, exist_ok=True)
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 
+@app.route("/health", methods=["GET"])
+def health():
+    return "ok", 200, {"Content-Type": "text/plain"}
+
 @app.route("/sign", methods=["POST"])
 def sign_document():
     """
@@ -90,8 +94,10 @@ def sign_document():
     return jsonify({
         "doc_id": doc_id,
         "verify_url": request.url_root + f"v/{doc_id}",
+        "download_url": request.url_root + f"download/{doc_id}",
         "download_name": download_name
     }), 200
+
 
 @app.route("/verify", methods=["POST"])
 def verify_document():
@@ -178,7 +184,7 @@ def verificacion_publica(doc_id):
             padding: 0;
             box-sizing: border-box;
           }}
-          body {{
+          html, body {{
             background: #f0f2f5;
             font-family: 'Segoe UI', sans-serif;
             color: #2c2c2c;
@@ -313,7 +319,8 @@ def verificacion_publica(doc_id):
           }}
 
           @media (max-width: 600px) {{
-            body {{
+            html, body {{
+              overflow-x: hidden;
               font-size: 0.95rem;
             }}
             header {{
@@ -389,9 +396,6 @@ def verificacion_publica(doc_id):
     </html>
     """
     return html
-
-
-
 
 
 @app.route("/file/<doc_id>")
