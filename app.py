@@ -188,6 +188,45 @@ def sign_json():
 
     return pdf_sellado_bytes, 200, headers
 
+@app.route("/sign-binary-body", methods=["POST"])
+def sign_binary_body():
+    # ← 1) bytes puros del PDF
+    pdf_bytes = request.data
+    if not pdf_bytes.startswith(b"%PDF"):
+        return jsonify({"error": "El body no parece un PDF"}), 400
+
+    # ← 2) metadatos desde headers
+    uploader = request.headers.get("X-Uploader", "—")
+    area     = request.headers.get("X-Area", "—")
+    orig_fn  = request.headers.get("X-Original-Filename", "documento.pdf")
+
+    user_meta = {
+        "uploader": uploader,
+        "area": area,
+        "original_filename": orig_fn
+    }
+
+    # 3) Firmar sin tocar disco
+    pdf_sellado_bytes, doc_id = sell(
+        pdf_bytes,
+        user_meta,
+        PRIVATE_KEY,
+        base_url=request.url_root + "v/"
+    )
+
+    # 4) Headers de respuesta
+    headers = {
+        "X-Doc-ID":            doc_id,
+        "X-Verify-URL":        request.url_root + f"v/{doc_id}",
+        "X-Uploader":          uploader,
+        "X-Area":              area,
+        "X-Original-Filename": orig_fn,
+        "X-Uploaded-At":       dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "X-Download-Name":     f"{os.path.splitext(orig_fn)[0]}_sellado.pdf",
+        "Content-Disposition": f'attachment; filename="{doc_id}.pdf"'
+    }
+    return pdf_sellado_bytes, 200, headers
+
 
 @app.route("/v/<doc_id>")
 def verificacion_publica(doc_id):
