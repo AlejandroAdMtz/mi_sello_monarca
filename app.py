@@ -187,6 +187,7 @@ def sign_json():
 
     # 3) Cabezeras para el Flow
     headers = {
+        "Content-Type":       "application/pdf",          #  ← NUEVO
         "X-Doc-ID":            doc_id,
         "X-Verify-URL":        request.url_root + f"v/{doc_id}",
         "X-Uploader":          uploader,
