@@ -136,7 +136,7 @@ def sign_binary():
     return pdf_sellado_bytes, 200, headers
 
 
-import base64
+import base64, re
 
 @app.route("/sign-json", methods=["POST"])
 def sign_json():
@@ -154,10 +154,21 @@ def sign_json():
     except KeyError as e:
         return jsonify({"error": f"Falta campo {e}"}), 400
 
+
     # 1) Decodifica el PDF
     try:
-        pdf_bytes = base64.b64decode(file_b64)
-    except Exception:
+        # a) quita prefijos tipo "data:application/pdf;base64,"
+        if file_b64.startswith("data:"):
+            file_b64 = file_b64.split(",", 1)[1]
+
+        # b) elimina blancos y saltos (\s incluye \r \n \t y espacios)
+        file_b64_clean = re.sub(r"\s+", "", file_b64)
+
+        # c) decodifica; validate=True obliga a que sean caracteres base64 válidos
+        pdf_bytes = base64.b64decode(file_b64_clean, validate=True)
+
+    except Exception as e:
+        print("B64 error:", e)          # aparecerá en los logs de Render
         return jsonify({"error": "base64 inválido"}), 400
 
     user_meta = {
