@@ -148,11 +148,10 @@ def sign_json():
         base_url=request.url_root + "v/"
     )
 
-    # 2 bis) Guarda local solo si lo pides
-    if SAVE_LOCAL:
-        os.makedirs(STORAGE_DIR, exist_ok=True)
-        with open(os.path.join(STORAGE_DIR, f"{doc_id}.pdf"), "wb") as f:
-            f.write(pdf_sellado_bytes)
+    # 4. Guardar el PDF sellado con nombre único = {doc_id}.pdf
+    save_path = os.path.join(STORAGE_DIR, f"{doc_id}.pdf")
+    with open(save_path, "wb") as f:
+        f.write(pdf_sellado_bytes)
 
     # 3) Cabezeras para el Flow
     headers = {
