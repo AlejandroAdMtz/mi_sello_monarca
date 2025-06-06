@@ -38,6 +38,7 @@ SP_DOC_LIB   = os.getenv("SP_DOC_LIB")
 SP_LIST      = os.getenv("SP_LIST")
 API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:5000")
 TZ           = os.getenv("TZ", "America/Monterrey")
+SAVE_LOCAL = os.getenv("SAVE_LOCAL", "0") == "1" # Si es 1, guarda PDFs en disco local
 
 # Crear carpeta local para PDFs
 STORAGE_DIR = "storage"
@@ -98,44 +99,6 @@ def sign_document():
         "download_name": download_name
     }), 200
 
-@app.route("/sign-binary", methods=["POST"])
-def sign_binary():
-    if "file" not in request.files or "meta" not in request.form:
-        return jsonify({"error": "Falta archivo o metadatos"}), 400
-
-    pdf_bytes  = request.files["file"].read()
-    user_meta  = json.loads(request.form["meta"])
-
-    # 1. Sellar (sin guardar a disco)
-    pdf_sellado_bytes, doc_id = sell(
-        pdf_bytes,
-        user_meta,
-        PRIVATE_KEY,
-        base_url=request.url_root + "v/"
-    )
-
-    # 2. Construir headers que el Flow llenará en SharePoint
-    headers = {
-        # nombre “bonito” que guardaremos como archivo
-        "X-Download-Name": f"{os.path.splitext(user_meta['original_filename'])[0]}_sellado.pdf",
-        # ID interno del documento
-        "X-Doc-ID":        doc_id,
-        # URL pública de verificación (para la columna VerifyURL)
-        "X-Verify-URL":    request.url_root + f"v/{doc_id}",
-        # Fecha ISO (para UploadedAt)
-        "X-Uploaded-At":   dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-        # Propiedades visibles
-        "X-Uploader":      user_meta["uploader"],
-        "X-Area":          user_meta["area"],
-        "X-Original-Filename": user_meta["original_filename"],
-        # Content-Disposition para que cURL/Flow sepa el nombre sugerido
-        "Content-Disposition": f'attachment; filename="{doc_id}.pdf"'
-    }
-
-    # 3. Responder el PDF sellado como binario
-    return pdf_sellado_bytes, 200, headers
-
-
 import base64, re
 
 @app.route("/sign-json", methods=["POST"])
@@ -185,6 +148,12 @@ def sign_json():
         base_url=request.url_root + "v/"
     )
 
+    # 2 bis) Guarda local solo si lo pides
+    if SAVE_LOCAL:
+        os.makedirs(STORAGE_DIR, exist_ok=True)
+        with open(os.path.join(STORAGE_DIR, f"{doc_id}.pdf"), "wb") as f:
+            f.write(pdf_sellado_bytes)
+
     # 3) Cabezeras para el Flow
     headers = {
         "Content-Type":       "application/pdf",          #  ← NUEVO
@@ -200,44 +169,6 @@ def sign_json():
 
     return pdf_sellado_bytes, 200, headers
 
-@app.route("/sign-binary-body", methods=["POST"])
-def sign_binary_body():
-    # ← 1) bytes puros del PDF
-    pdf_bytes = request.data
-    if not pdf_bytes.startswith(b"%PDF"):
-        return jsonify({"error": "El body no parece un PDF"}), 400
-
-    # ← 2) metadatos desde headers
-    uploader = request.headers.get("X-Uploader", "—")
-    area     = request.headers.get("X-Area", "—")
-    orig_fn  = request.headers.get("X-Original-Filename", "documento.pdf")
-
-    user_meta = {
-        "uploader": uploader,
-        "area": area,
-        "original_filename": orig_fn
-    }
-
-    # 3) Firmar sin tocar disco
-    pdf_sellado_bytes, doc_id = sell(
-        pdf_bytes,
-        user_meta,
-        PRIVATE_KEY,
-        base_url=request.url_root + "v/"
-    )
-
-    # 4) Headers de respuesta
-    headers = {
-        "X-Doc-ID":            doc_id,
-        "X-Verify-URL":        request.url_root + f"v/{doc_id}",
-        "X-Uploader":          uploader,
-        "X-Area":              area,
-        "X-Original-Filename": orig_fn,
-        "X-Uploaded-At":       dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "X-Download-Name":     f"{os.path.splitext(orig_fn)[0]}_sellado.pdf",
-        "Content-Disposition": f'attachment; filename="{doc_id}.pdf"'
-    }
-    return pdf_sellado_bytes, 200, headers
 
 @app.route("/verify", methods=["POST"])
 def verify_document():
@@ -864,8 +795,6 @@ def verify_ui():
     </html>
     """
     return html
-
-
 
 
 if __name__ == "__main__":
