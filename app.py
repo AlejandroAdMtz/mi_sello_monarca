@@ -246,7 +246,7 @@ def verificacion_publica(doc_id):
     <html lang="es">
       <head>
         <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>Verificación Casa Monarca</title>
         <style>
           * {{
@@ -256,16 +256,14 @@ def verificacion_publica(doc_id):
           }}
           html, body {{
             background: #f0f2f5;
-            font-family: 'Segoe UI', 'Helvetica Neue', sans-serif;
+            font-family: 'Segoe UI', sans-serif;
             color: #2c2c2c;
-            line-height: 1.5;
           }}
           a {{
             text-decoration: none;
             color: inherit;
           }}
 
-          /* HEADER CON LOGOS EN ESQUINAS PARA DESKTOP */
           header {{
             background: white;
             padding: 15px 40px;
@@ -273,83 +271,82 @@ def verificacion_publica(doc_id):
             align-items: center;
             justify-content: space-between;
             border-bottom: 1px solid #e0e0e0;
-            position: relative;
+            flex-wrap: wrap;
           }}
-          .logo-tec {{
-            height: 55px;  /* Más grande para desktop */
-          }}
-          .logo-casa {{
-            height: 55px;  /* Más grande para desktop */
+          header img {{
+            height: 45px;
+            max-width: 100px;
+            object-fit: contain;
+            margin: 5px 10px;
           }}
           header h2 {{
-            font-size: 1.4rem;
+            font-size: 1.3rem;
             color: #1a1a1a;
-            position: absolute;
-            left: 50%;
-            transform: translateX(-50%);
+            letter-spacing: 0.05em;
+            text-align: center;
+            flex-grow: 1;
           }}
 
           main {{
             display: flex;
             justify-content: center;
             margin: 40px 20px;
+            width: 100%;
             padding: 0 10px;
           }}
           .tarjeta {{
             background: white;
             width: 100%;
-            max-width: 800px;
+            max-width: 700px;
             border-radius: 8px;
-            box-shadow: 0 3px 15px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
             overflow: hidden;
           }}
           .tarjeta .contenido {{
-            padding: 30px;
+            padding: 25px 30px;
           }}
 
           .tarjeta h1 {{
-            font-size: 1.8rem;
+            font-size: 1.6rem;
             margin-bottom: 25px;
             text-align: center;
-            color: #00539c;
           }}
           .estado {{
             display: block;
             text-align: center;
-            margin: 0 auto 25px auto;
-            padding: 12px 20px;
-            border-radius: 6px;
+            margin: 0 auto 20px auto;
+            padding: 10px 16px;
+            border-radius: 4px;
             font-weight: bold;
-            font-size: 1.2rem;
-            max-width: 300px;
+            font-size: 1rem;
           }}
           .estado.valido {{
             background: #d4edda;
             color: #155724;
-            border: 2px solid #155724;
           }}
           .estado.invalido {{
             background: #f8d7da;
             color: #721c24;
-            border: 2px solid #721c24;
           }}
 
           .tabla-meta {{
             width: 100%;
             border-collapse: collapse;
-            margin: 30px 0;
-            font-size: 1.1rem;
+            margin: 20px 0 30px;
+            display: block;
+            overflow-x: auto;
+            white-space: nowrap;
           }}
           .tabla-meta th, .tabla-meta td {{
             border: 1px solid #d0d0d0;
-            padding: 15px 20px;
+            padding: 10px 12px;
             text-align: left;
           }}
           .tabla-meta th {{
             background: #00539c;
             color: white;
-            font-weight: 500;
-            width: 30%;
+            font-weight: normal;
+            width: 35%;
           }}
           .tabla-meta td {{
             background: #fafafa;
@@ -357,110 +354,81 @@ def verificacion_publica(doc_id):
 
           .visor-pdf {{
             width: 100%;
-            height: 550px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            margin: 30px 0;
+            max-width: 100%;
+            height: 500px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin-bottom: 25px;
           }}
 
           .boton-descarga {{
             display: flex;
             justify-content: center;
-            margin: 30px 0;
+            margin-bottom: 20px;
           }}
           .boton-descarga a {{
             background: #FF584D;
             color: white;
-            padding: 15px 40px;
-            border-radius: 6px;
-            font-size: 1.2rem;
+            padding: 12px 28px;
+            border-radius: 4px;
+            font-size: 1rem;
             font-weight: bold;
-            transition: background 0.3s;
+            transition: background 0.2s;
             text-align: center;
-            box-shadow: 0 4px 8px rgba(255, 88, 77, 0.3);
           }}
           .boton-descarga a:hover {{
             background: #e74c3c;
-            transform: translateY(-2px);
           }}
 
           footer {{
             text-align: center;
-            padding: 20px;
-            font-size: 0.9rem;
+            padding: 15px 0;
+            font-size: 0.85rem;
             color: #666;
             background: #fafafa;
-            border-top: 1px solid #eee;
           }}
 
-          /* MEDIA QUERIES PARA MÓVILES */
-          @media (max-width: 768px) {{
+          @media (max-width: 600px) {{
+            html, body {{
+              overflow-x: hidden;
+              font-size: 0.95rem;
+            }}
             header {{
               flex-direction: column;
-              padding: 15px;
-              text-align: center;
+              align-items: center;
+              gap: 5px;
+              padding: 20px 10px;
             }}
-            .logo-tec, .logo-casa {{
-              height: 45px;
-              margin: 5px 0;
+            header img {{
+              height: 40px;
             }}
             header h2 {{
-              position: static;
-              transform: none;
-              margin: 10px 0;
-              font-size: 1.3rem;
-              width: 100%;
-            }}
-            .tarjeta .contenido {{
-              padding: 20px;
-            }}
-            .tarjeta h1 {{
-              font-size: 1.4rem;
-            }}
-            .estado {{
-              font-size: 1rem;
-              padding: 10px;
-            }}
-            .tabla-meta th, 
-            .tabla-meta td {{
-              padding: 10px 12px;
-              font-size: 0.95rem;
-            }}
-            .visor-pdf {{
-              height: 350px;
-            }}
-            .boton-descarga a {{
-              padding: 12px 25px;
               font-size: 1.1rem;
-              width: 100%;
-              max-width: 300px;
+              margin: 5px 0;
             }}
-          }}
-
-          @media (max-width: 480px) {{
             .tarjeta .contenido {{
-              padding: 15px;
-            }}
-            .tarjeta h1 {{
-              font-size: 1.25rem;
-            }}
-            .estado {{
+              padding: 20px 15px;
               font-size: 0.95rem;
             }}
-            .visor-pdf {{
-              height: 280px;
+            .tarjeta h1 {{
+              font-size: 1.3rem;
+            }}
+            .tabla-meta th,
+            .tabla-meta td {{
+              font-size: 0.85rem;
             }}
             .boton-descarga a {{
-              font-size: 1rem;
+              width: 100%;
+              padding: 12px;
             }}
           }}
         </style>
       </head>
       <body>
         <header>
-          <img class="logo-tec" src="{logo_tec}" alt="Tecnológico de Monterrey" />
+          <img src="{logo_tec}" alt="Logo TECNOLOGICO DE MONTERREY" />
           <h2>SELLO MONARCA</h2>
-          <img class="logo-casa" src="{logo_casa}" alt="Casa Monarca" />
+          <img src="{logo_casa}" alt="Logo CASA MONARCA" />
         </header>
 
         <main>
@@ -468,7 +436,7 @@ def verificacion_publica(doc_id):
             <div class="contenido">
               <h1>Verificación de Documento</h1>
               <div class="estado {'valido' if es_valido else 'invalido'}">
-                {'✅ DOCUMENTO VÁLIDO' if es_valido else '❌ DOCUMENTO NO VÁLIDO'}
+                {'✅ VÁLIDO' if es_valido else '❌ NO VÁLIDO'}
               </div>
 
               <table class="tabla-meta">
@@ -484,7 +452,7 @@ def verificacion_publica(doc_id):
 
               <div class="boton-descarga">
                 <a href="/download/{doc_id}" download="{download_name}">
-                  📥 DESCARGAR DOCUMENTO
+                  📥 Descargar "{download_name}"
                 </a>
               </div>
             </div>
@@ -551,81 +519,70 @@ def verify_ui():
     <html lang="es">
       <head>
         <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>Verificar PDF Sellado</title>
         <style>
-          * {{ 
-            margin: 0; 
-            padding: 0; 
-            box-sizing: border-box; 
-          }}
+          /* Reset básico */
+          * {{ margin: 0; padding: 0; box-sizing: border-box; }}
           body {{
             background: #f0f2f5;
-            font-family: 'Segoe UI', 'Helvetica Neue', sans-serif;
+            font-family: 'Segoe UI', sans-serif;
             color: #2c2c2c;
-            line-height: 1.5;
           }}
 
+          /* Header blanco */
           header {{
             background: white;
-            padding: 15px 20px;
+            padding: 15px 40px;
             display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
             align-items: center;
-            gap: 15px;
+            justify-content: space-between;
             border-bottom: 1px solid #e0e0e0;
           }}
-          .logo-container {{
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 15px;
-            width: 100%;
-          }}
           header img {{
-            height: 40px;
-            max-width: 100px;
-            object-fit: contain;
+            height: 45px;
+            margin: 0 10px;
           }}
           header h2 {{
-            font-size: 1.2rem;
+            font-size: 1.3rem;
             color: #1a1a1a;
-            text-align: center;
-            width: 100%;
+            letter-spacing: 0.05em;
           }}
 
+          /* Contenedor principal centrado */
           main {{
             display: flex;
             justify-content: center;
-            margin: 30px 15px;
+            margin: 40px 20px;
           }}
           .tarjeta {{
             background: white;
             width: 100%;
             max-width: 700px;
             border-radius: 8px;
-            box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
             overflow: hidden;
           }}
           .tarjeta .contenido {{
-            padding: 20px;
+            padding: 25px 30px;
           }}
 
+          /* Título y subtítulo */
           .tarjeta h1 {{
-            font-size: 1.4rem;
-            margin-bottom: 10px;
+            font-size: 1.6rem;
+            margin-bottom: 5px;
             text-align: center;
           }}
-          .subtitulo {{
+          .tarjeta p.subtitulo {{
             font-size: 1rem;
             color: #555;
             margin-bottom: 20px;
             text-align: center;
           }}
 
+          /* Drop Zone con estado híbrido */
           #dropZone {{
-            height: 180px;
+            height: 200px;
             border: 3px dashed #ccc;
             border-radius: 8px;
             display: flex;
@@ -633,13 +590,11 @@ def verify_ui():
             justify-content: center;
             color: #777;
             font-size: 1.1rem;
-            transition: all 0.3s ease;
-            margin-bottom: 20px;
+            transition: border-color 0.2s, color 0.2s, background 0.2s;
+            margin-bottom: 25px;
             cursor: pointer;
             user-select: none;
             background: #fafafa;
-            text-align: center;
-            padding: 15px;
           }}
           #dropZone.dragover {{
             border-color: #00539c;
@@ -647,18 +602,19 @@ def verify_ui():
             background: #e8f0fe;
           }}
 
+          /* Input file oculto (se dispara al hacer clic en el dropZone) */
           input[type="file"] {{
             display: none;
           }}
 
+          /* Estado de validación */
           .estado {{
             display: inline-block;
-            padding: 10px 15px;
+            padding: 10px 16px;
             border-radius: 4px;
             font-weight: bold;
             font-size: 1rem;
-            margin-bottom: 15px;
-            width: 100%;
+            margin-bottom: 20px;
             text-align: center;
           }}
           .valido {{
@@ -670,117 +626,169 @@ def verify_ui():
             color: #721c24;
           }}
 
-          .tabla-meta-container {{
-            overflow-x: auto;
-            margin: 20px 0;
-            -webkit-overflow-scrolling: touch;
-          }}
+          /* Tabla de metadatos */
           .tabla-meta {{
             width: 100%;
             border-collapse: collapse;
+            margin: 20px 0 30px;
           }}
           .tabla-meta th, .tabla-meta td {{
             border: 1px solid #d0d0d0;
             padding: 10px 12px;
             text-align: left;
-            min-width: 120px;
           }}
           .tabla-meta th {{
             background: #00539c;
             color: white;
-            font-weight: 500;
+            font-weight: normal;
+            width: 35%;
           }}
-          .tabla-meta td {{ 
-            background: #fafafa; 
-            word-break: break-word;
-          }}
+          .tabla-meta td {{ background: #fafafa; }}
 
+          /* Pie de página */
           footer {{
             text-align: center;
-            padding: 15px 10px;
-            font-size: 0.8rem;
+            padding: 15px 0;
+            font-size: 0.85rem;
             color: #666;
             background: #fafafa;
-            margin-top: 30px;
-          }}
-
-          /* Media queries para móviles */
-          @media (max-width: 768px) {{
-            header {{
-              padding: 12px 15px;
-            }}
-            header h2 {{
-              font-size: 1.1rem;
-            }}
-            .tarjeta .contenido {{
-              padding: 15px;
-            }}
-            .tarjeta h1 {{
-              font-size: 1.25rem;
-            }}
-            .subtitulo {{
-              font-size: 0.9rem;
-            }}
-            #dropZone {{
-              height: 150px;
-              font-size: 1rem;
-              padding: 10px;
-            }}
-            .estado {{
-              font-size: 0.9rem;
-              padding: 8px 10px;
-            }}
-            .tabla-meta th, 
-            .tabla-meta td {{
-              padding: 8px 10px;
-              font-size: 0.9rem;
-            }}
-          }}
-
-          @media (max-width: 480px) {{
-            .logo-container {{
-              flex-direction: column;
-              align-items: center;
-              gap: 8px;
-            }}
-            #dropZone {{
-              height: 120px;
-              font-size: 0.95rem;
-            }}
+            margin-top: 40px;
           }}
         </style>
       </head>
 
       <body>
+        <!-- Header con logos -->
         <header>
-          <div class="logo-container">
-            <img src="{url_for('static', filename='logo_tec.png')}" alt="Logo TECNOLOGICO DE MONTERREY" />
-            <img src="{url_for('static', filename='logo_casa_monarca.png')}" alt="Logo CASA MONARCA" />
-          </div>
+          <img src="{url_for('static', filename='logo_tec.png')}" alt="Logo TECNOLOGICO DE MONTERREY" />
           <h2>SELLO MONARCA</h2>
+          <img src="{url_for('static', filename='logo_casa_monarca.png')}" alt="Logo CASA MONARCA" />
         </header>
 
+        <!-- Contenedor principal -->
         <main>
           <div class="tarjeta">
             <div class="contenido">
               <h1>Arrastra o haz clic para subir tu PDF</h1>
               <p class="subtitulo">Sólo archivos .pdf válidos</p>
 
+              <!-- Drop Zone híbrido -->
               <div id="dropZone">
                 📁 Selecciona o arrastra aquí tu PDF
               </div>
+
+              <!-- Input file oculto -->
               <input type="file" id="fileInput" accept="application/pdf" />
+
+              <!-- Resultado (estado + metadatos) -->
               <div id="result"></div>
             </div>
           </div>
         </main>
 
+        <!-- Pie de página -->
         <footer>
           &copy; {dt.datetime.utcnow().year} CASA MONARCA • TECNOLOGICO DE MONTERREY
         </footer>
 
         <script>
-          // ... (mismo javascript previo)
+          const dropZone = document.getElementById('dropZone');
+          const resultDiv = document.getElementById('result');
+          const fileInput = document.getElementById('fileInput');
+          const apiURL = "{verify_api_url}";
+
+          // Función que maneja un archivo PDF: lo envía a /verify y muestra el resultado
+          async function handleFile(file) {{
+            // Validar tipo
+            if (!file || file.type !== "application/pdf") {{
+              resultDiv.innerHTML = "<p style='color:red; font-weight:bold;'>Por favor, sube un archivo PDF válido.</p>";
+              return;
+            }}
+
+            resultDiv.innerHTML = "<p>Verificando el documento…</p>";
+
+            const formData = new FormData();
+            formData.append("file", file);
+
+            try {{
+              const resp = await fetch(apiURL, {{
+                method: "POST",
+                body: formData
+              }});
+              const data = await resp.json();
+
+              if (data.valid) {{
+                // Construir tabla de metadatos formateada
+                let html = "<div class='estado valido'>✅ VÁLIDO</div>";
+                html += "<table class='tabla-meta'><tbody>";
+
+                // Los campos que mostraremos
+                const campos = {{
+                  "Área": data.meta.area || "—",
+                  "Document ID": data.meta.id || "—",
+                  "Nombre original": data.meta.original_filename || "—",
+                  "Subido por": data.meta.uploader || "—",
+                  // Formatear fecha UTC->MTY
+                  "Fecha": (() => {{
+                    const raw = data.meta.uploaded_at || "";
+                    try {{
+                      const dtUtc = new Date(raw);
+                      dtUtc.setHours(dtUtc.getHours());
+                      const meses = [
+                        "enero","febrero","marzo","abril","mayo","junio",
+                        "julio","agosto","septiembre","octubre","noviembre","diciembre"
+                      ];
+                      const d = dtUtc.getDate();
+                      const m = meses[dtUtc.getMonth()];
+                      const a = dtUtc.getFullYear();
+                      const h = String(dtUtc.getHours()).padStart(2, "0");
+                      const mi = String(dtUtc.getMinutes()).padStart(2, "0");
+                      return `${{d}} ${{m}} ${{a}}, ${{h}}:${{mi}} (MTY)`;
+                    }} catch {{
+                      return raw;
+                    }}
+                  }})()
+                }};
+
+                for (const [k,v] of Object.entries(campos)) {{
+                  html += `<tr><th>${{k}}</th><td>${{v}}</td></tr>`;
+                }}
+                html += "</tbody></table>";
+                resultDiv.innerHTML = html;
+              }} else {{
+                resultDiv.innerHTML = "<div class='estado invalido'>❌ NO VÁLIDO</div>";
+              }}
+            }} catch (err) {{
+              console.error(err);
+              resultDiv.innerHTML = "<p style='color:red; font-weight:bold;'>Error al conectar con el servidor.</p>";
+            }}
+          }}
+
+          // Drag & drop: cambiar estilo al pasar archivo
+          dropZone.addEventListener('dragover', e => {{
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+          }});
+          dropZone.addEventListener('dragleave', () => {{
+            dropZone.classList.remove('dragover');
+          }});
+          dropZone.addEventListener('drop', e => {{
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            handleFile(file);
+          }});
+
+          // Al hacer clic en dropZone, abre fileInput
+          dropZone.addEventListener('click', () => {{
+            fileInput.click();
+          }});
+
+          // Cuando seleccionan archivo con fileInput
+          fileInput.addEventListener('change', () => {{
+            const file = fileInput.files[0];
+            handleFile(file);
+          }});
         </script>
       </body>
     </html>
