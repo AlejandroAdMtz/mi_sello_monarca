@@ -1,46 +1,111 @@
 # sello_monarca/qr_handler.py
 from io import BytesIO
-import qrcode
+import os, qrcode, datetime
+from urllib.parse import urlparse, parse_qs
+
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.utils import ImageReader
+from reportlab.lib.units import cm
+from reportlab.lib import colors
+
+# Ajusta el nombre o la ruta si tu archivo se llama distinto
+LOGO_PATH = 'static\logo_casa_monarca.png'
+
 
 def generar_pagina_qr_bytes(url: str) -> bytes:
     """
-    Devuelve un PDF en bytes con una sola página que contiene el QR
+    Genera una portada PDF que contiene:
+      – Logotipo de Casa Monarca
+      – Título “Sello Monarca”
+      – Subtítulo “Verificación de documentos”
+      – Código QR (link clicable y texto)
+      – Metadatos ligeros (ID y fecha)
+    Devuelve los bytes del PDF para que insertes la página al final
+    con tu función insertar_pagina_qr().
     """
-    # Generar imagen del QR
-    qr_img = qrcode.make(url)
+    # ---------- Extrae metadatos -------
+    doc_id = parse_qs(urlparse(url).query).get("id", [""])[0]
+    fecha  = datetime.datetime.utcnow().strftime("%d-%b-%Y")
+
+    # ---------- QR ----------
     qr_buf = BytesIO()
-    qr_img.save(qr_buf, format="PNG")
+    qrcode.make(url).save(qr_buf, format="PNG")
     qr_buf.seek(0)
-    qr_reader = ImageReader(qr_buf)
+    qr_img = ImageReader(qr_buf)
 
-    # Generar PDF con esa imagen
-    pdf_buf = BytesIO()
-    c = canvas.Canvas(pdf_buf, pagesize=letter)
-    c.drawImage(qr_reader, 150, 300, width=300, height=300)
-    c.setFont("Helvetica", 12)
-    c.drawCentredString(300, 280, "Escanea para verificar autenticidad")
-    c.showPage()  # ← cierra la página y permite que el PDF sea válido
+    # ---------- Logo ----------
+    logo_img = ImageReader(LOGO_PATH)
+    lw_pt, lh_pt = logo_img.getSize()
+    max_logo = 4 * cm                        # límite en 4 cm sin deformar
+    scale = min(max_logo / lw_pt, max_logo / lh_pt, 1)
+    lw, lh = lw_pt * scale, lh_pt * scale
+
+    # ---------- Página ----------
+    buf = BytesIO()
+    c   = canvas.Canvas(buf, pagesize=letter)
+    W, H = letter
+
+    # 1) Encabezado
+    top_y = H - 2 * cm
+    # Logo
+    c.drawImage(logo_img, 2 * cm, top_y - lh, lw, lh, mask="auto")
+    # Título “Sello Monarca”
+    c.setFont("Helvetica-Bold", 24)
+    c.drawString(2 * cm + lw + 3 * cm, top_y - (lh / 2) - 10, "Sello Monarca")
+    # Línea divisoria
+    c.setStrokeColor(colors.grey)
+    c.line(2 * cm, top_y - lh - 0.4 * cm, W - 2 * cm, top_y - lh - 0.4 * cm)
+    # Sub-título
+    c.setFont("Helvetica-Oblique", 13)
+    c.setFillColor(colors.darkgray)
+    c.drawString(2 * cm, top_y - lh - 1.1 * cm, "Verificación de documentos")
+    c.setFillColor(colors.black)
+
+    # 2) QR centrado
+    qr_side = 8 * cm
+    qr_y = H / 2 - qr_side / 2 + 2.5 * cm    # un poco más arriba para compactar
+    c.drawImage(
+        qr_img,
+        (W - qr_side) / 2,
+        qr_y,
+        qr_side,
+        qr_side,
+        mask="auto"
+    )
+
+    # 3) Mensaje principal
+    ty = qr_y - 1.2 * cm
+    c.setFont("Helvetica", 11)
+    c.drawCentredString(W / 2, ty,
+        "Este PDF está firmado digitalmente por Casa Monarca.")
+    c.drawCentredString(W / 2, ty - 0.45 * cm,
+        "Escanea el código QR o visita la URL para confirmar su autenticidad:")
+
+    # URL clicable
+    link_y = ty - 1.1 * cm
+    c.setFillColor(colors.blue)
+    c.drawCentredString(W / 2, link_y, url)
+    c.linkURL(url, (W * 0.1, link_y - 0.2 * cm, W * 0.9, link_y + 0.3 * cm), relative=0)
+    c.setFillColor(colors.black)
+
+    # 4) Metadatos gris
+    meta_y = 2 * cm
+    c.setFont("Helvetica", 9)
+    c.setFillColor(colors.grey)
+    if doc_id:
+        c.drawString(2 * cm, meta_y, f"ID del documento: {doc_id}")
+    c.drawString(W - 2 * cm - 130, meta_y, f"Emitido: {fecha}")
+    c.setFillColor(colors.black)
+
+    c.showPage()
     c.save()
+    buf.seek(0)
+    return buf.getvalue()
 
-    pdf_buf.seek(0)
-    return pdf_buf.getvalue()
 
-
-def insertar_pagina_qr(pdf_base: str, pdf_salida: str, qr_url: str):
-    """Agrega una página con QR al final del PDF base"""
-    pagina_qr = "temp_pagina_qr.pdf"
-    generar_pagina_qr(qr_url, pagina_qr)
-
-    base = PdfReader(pdf_base)
-    qr = PdfReader(pagina_qr)
-    writer = PdfWriter()
-
-    for page in base.pages:
-        writer.add_page(page)
-    writer.add_page(qr.pages[0])  # Agregar página QR
-
-    with open(pdf_salida, "wb") as f:
-        writer.write(f)
+# ------------------ Ayudante opcional (sin cambios) ------------------
+def generar_pagina_qr(url: str, path: str) -> None:
+    """Guarda en 'path' el PDF generado."""
+    with open(path, "wb") as f:
+        f.write(generar_pagina_qr_bytes(url))
