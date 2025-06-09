@@ -8,9 +8,12 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.utils import ImageReader
 from reportlab.lib.units import cm
 from reportlab.lib import colors
+from flask import current_app
+
 
 # Ajusta el nombre o la ruta si tu archivo se llama distinto
-LOGO_PATH = 'static\logo_casa_monarca.png'
+# dentro de la función que genera el PDF (o justo antes)
+
 
 
 def generar_pagina_qr_bytes(url: str) -> bytes:
@@ -35,7 +38,8 @@ def generar_pagina_qr_bytes(url: str) -> bytes:
     qr_img = ImageReader(qr_buf)
 
     # ---------- Logo ----------
-    logo_img = ImageReader(LOGO_PATH)
+    logo_path = os.path.join(current_app.static_folder, "logo_casa_monarca.png")
+    logo_img  = ImageReader(logo_path)
     lw_pt, lh_pt = logo_img.getSize()
     max_logo = 4 * cm                        # límite en 4 cm sin deformar
     scale = min(max_logo / lw_pt, max_logo / lh_pt, 1)
